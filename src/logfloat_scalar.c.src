@@ -1,0 +1,95 @@
+//
+// Define the logfloat32 and logfloat64 types.
+//
+
+#include <Python.h>
+
+#define PY_ARRAY_UNIQUE_SYMBOL numtypesx_ARRAY_API
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#define NO_IMPORT_ARRAY
+#include "numpy/arrayobject.h"
+#include <numpy/arrayscalars.h>
+
+#include "logfloat_scalar.h"
+
+
+/**begin repeat
+ *
+ * #nbits = 32, 64#
+ * #ctype = float, double#
+ * #suffix = f, #
+ */
+
+//
+// .tp_new
+//
+static PyObject *
+LogFloat@nbits@Scalar_new(PyTypeObject *cls, PyObject *args, PyObject *kwds)
+{
+    static char *kwargs_strs[] = {"log", NULL};
+    double value;
+
+    if (!PyArg_ParseTupleAndKeywords(
+            args, kwds, "d:LogFloat@nbits@Scalar", kwargs_strs,
+            &value)) {
+        return NULL;
+    }
+
+    LogFloat@nbits@Scalar *new = PyObject_New(LogFloat@nbits@Scalar, cls);
+    if (new == NULL) {
+        return NULL;
+    }
+    new->log = value;
+
+    return (PyObject *)new;
+}
+
+//
+// .tp_str and .tp_repr
+//
+static PyObject*
+LogFloat@nbits@Scalar_str(PyObject* self)
+{
+    // Use the corresponding str method of np.float32 or np.float64
+    // to print the log value stored in the logfloat@nbits@ object.
+    PyObject *pyobj = PyArrayScalar_New(Float@nbits@);
+    if (pyobj == NULL) {
+        return NULL;
+    }
+    PyArrayScalar_ASSIGN(pyobj, Float@nbits@, ((LogFloat@nbits@Scalar *)self)->log);
+    PyObject *obj = PyUnicode_FromFormat("logfloat@nbits@(log=%S)", pyobj);
+    Py_DECREF(pyobj);
+    return obj;
+}
+
+static PyObject *
+LogFloat@nbits@Scalar_get_log(PyObject* self, void *ignore)
+{
+    // Convert the log value to a np.float@nbits@.
+    PyObject *pyobj = PyArrayScalar_New(Float@nbits@);
+    if (pyobj == NULL) {
+        return NULL;
+    }
+    PyArrayScalar_ASSIGN(pyobj, Float@nbits@, ((LogFloat@nbits@Scalar *)self)->log);
+    return pyobj;
+}
+
+
+// The 'log' attribute is read-only.
+
+static PyGetSetDef LogFloat@nbits@Scalar_getset[] = {
+    {"log", LogFloat@nbits@Scalar_get_log, NULL, "natural log of the number", NULL},
+    {NULL}, // Sentinel
+};
+
+PyTypeObject LogFloat@nbits@Scalar_Type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name      = "numtypesx.LogFloat@nbits@Scalar",
+    .tp_basicsize = sizeof(LogFloat@nbits@Scalar),
+    .tp_new       = LogFloat@nbits@Scalar_new,
+    .tp_repr      = (reprfunc)LogFloat@nbits@Scalar_str,
+    .tp_str       = (reprfunc)LogFloat@nbits@Scalar_str,
+    .tp_getset    = LogFloat@nbits@Scalar_getset,
+};
+
+/**end repeat**/

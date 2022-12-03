@@ -1,0 +1,268 @@
+#include <Python.h>
+
+#define PY_ARRAY_UNIQUE_SYMBOL numtypesx_ARRAY_API
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#define NO_IMPORT_ARRAY
+#include "numpy/arrayobject.h"
+#include "numpy/ndarraytypes.h"
+#include "numpy/ufuncobject.h"
+
+#include "numpy/experimental_dtype_api.h"
+
+#include "logfloat_dtype.h"
+#include "logfloat_umath.h"
+
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// The first template loop defines the C functions that operate on the
+// log values.  No Python or NumPy API is involved in the in this
+// template loop.
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+/**begin repeat
+ *
+ * #nbits = 32, 64#
+ * #ctype = float, double#
+ * #suffix = f, #
+ */
+
+//
+// Compute log(exp(log1) + exp(log2))
+//
+static @ctype@
+logfloat@nbits@_log_add(@ctype@ log1, @ctype@ log2)
+{
+    if (log1 == -INFINITY) {
+        return log2;
+    }
+    else if (log2 == -INFINITY) {
+        return log1;
+    }
+    else {
+        return ((log1 > log2) ? log1 : log2) + log1p@suffix@(exp@suffix@(-fabs@suffix@(log2 - log1)));
+    }
+}
+
+//
+// Compute log(exp(log1) - exp(log2))
+//
+// if log2 > log1, nan is returned.
+//
+/* Currently unused.
+static @ctype@
+logsubexp@suffix@(@ctype@ log1, @ctype@ log2)
+{
+    if (log2 == -INFINITY) {
+        return log1;
+    }
+    if (log1 < log2) {
+        return NAN;
+    }
+    if (log1 == log2) {
+        return -INFINITY;
+    }
+
+    return log1 + log1p@suffix@(-exp@suffix@(log2 - log1));
+}
+*/
+
+//
+// Compute log(exp(log1) - exp(log2))
+//
+// if log2 > log1, nan is returned.
+//
+static @ctype@
+logfloat@nbits@_log_subtract(@ctype@ log1, @ctype@ log2)
+{
+    if (log1 < log2) {
+        return NAN;
+    }
+    if (log1 == log2) {
+        return -INFINITY;
+    }
+    return log1 + log1p@suffix@(-exp@suffix@(log2 - log1));
+}
+
+//
+// Compute log(exp(log1) * exp(log2)) = log1 + log2
+//
+static @ctype@
+logfloat@nbits@_log_multiply(@ctype@ log1, @ctype@ log2)
+{
+    return log1 + log2;
+}
+
+//
+// Compute log(exp(log1) / exp(log2)) = log1 - log2
+//
+static @ctype@
+logfloat@nbits@_log_true_divide(@ctype@ log1, @ctype@ log2)
+{
+    return log1 - log2;
+}
+
+//
+// Compute log(exp(log1) ** exp(log2))
+//
+static @ctype@
+logfloat@nbits@_log_power(@ctype@ log1, @ctype@ log2)
+{
+    double value2 = exp(log2);
+    return value2*log1;
+}
+
+//
+// Compute +log1
+//
+/* Currently unused.
+static @ctype@
+logfloat@nbits@_log_positive(@ctype@ log1)
+{
+    return log1;
+}
+*/
+
+/**end repeat**/
+
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// In these nested template loops, the `resolve_descriptors` and
+// `strided loop` functions are defined.
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+// Note: The `stride_loop` functions assume that the values stored in
+// the input arrays are in native byte order.
+
+/**begin repeat
+ *
+ * #nbits = 32, 64#
+ * #ctype = float, double#
+ * #suffix = f, #
+ */
+
+/**begin repeat1
+ * #oper = add, subtract, multiply, true_divide, power #
+ */
+
+static NPY_CASTING
+logfloat@nbits@_@oper@_resolve_descriptors(
+    PyObject *self,
+    PyArray_DTypeMeta *dtypes[],
+    PyArray_Descr *given_descrs[],
+    PyArray_Descr *loop_descrs[],
+    npy_intp *unused
+)
+{
+    // The logfloat types are not parametrized, so we assume that
+    // given_descrs[0] and given_descrs[1] are the same.
+    Py_INCREF(given_descrs[0]);
+    loop_descrs[0] = given_descrs[0];
+    Py_INCREF(given_descrs[1]);
+    loop_descrs[1] = given_descrs[1];
+    if (given_descrs[2] == NULL) {
+        Py_INCREF(given_descrs[0]);
+        loop_descrs[2] = given_descrs[0];
+    }
+    return NPY_NO_CASTING;
+}
+
+static int
+logfloat@nbits@_@oper@_strided_loop(
+    PyArrayMethod_Context *context,
+    char *const args[],
+    npy_intp const dimensions[],
+    npy_intp const strides[],
+    NpyAuxData *auxdata)
+{
+    char *in1 = args[0];
+    char *in2 = args[1];
+    char *out = args[2];
+    npy_intp n = dimensions[0];
+    npy_intp in1_stride = strides[0];
+    npy_intp in2_stride = strides[1];
+    npy_intp out_stride = strides[2];
+
+    for (npy_intp k = 0; k < n; ++k, in1 += in1_stride,
+                                     in2 += in2_stride,
+                                     out += out_stride) {
+        @ctype@ x = *(@ctype@ *) in1;
+        @ctype@ y = *(@ctype@ *) in2;
+        *(@ctype@ *) out = logfloat@nbits@_log_@oper@(x, y);
+    }
+
+    return 0;
+}
+
+/**end repeat1**/
+
+/**end repeat**/
+
+
+int
+init_logfloat_ufuncs(void)
+{
+    PyObject *ufunc;
+
+    PyObject *numpy = PyImport_ImportModule("numpy");
+    if (numpy == NULL) {
+        return -1;
+    }
+
+    static PyArray_DTypeMeta *logfloat32_dtypes[3] = {
+        &LogFloat32DType_Type,
+        &LogFloat32DType_Type,
+        &LogFloat32DType_Type,
+    };
+
+    static PyArray_DTypeMeta *logfloat64_dtypes[3] = {
+        &LogFloat64DType_Type,
+        &LogFloat64DType_Type,
+        &LogFloat64DType_Type,
+    };
+
+/**begin repeat
+ * #oper = add, subtract, multiply, true_divide, power #
+ */
+
+    ufunc = PyObject_GetAttrString(numpy, "@oper@");
+    if (ufunc == NULL) {
+        Py_DECREF(numpy);
+        return -1;
+    }
+
+/**begin repeat1
+ *
+ * #nbits = 32, 64#
+ */
+
+    static PyType_Slot logfloat@nbits@_@oper@_slots[] = {
+        {NPY_METH_resolve_descriptors, &logfloat@nbits@_@oper@_resolve_descriptors},
+        {NPY_METH_strided_loop, &logfloat@nbits@_@oper@_strided_loop},
+        {0, NULL}
+    };
+
+    PyArrayMethod_Spec logfloat@nbits@_@oper@_spec = {
+        .name = "logfloat@nbits@_@oper@",
+        .nin = 2,
+        .nout = 1,
+        .dtypes = logfloat@nbits@_dtypes,
+        .slots = logfloat@nbits@_@oper@_slots,
+        .flags = 0,
+        .casting = NPY_NO_CASTING,
+    };
+
+    if (PyUFunc_AddLoopFromSpec(ufunc, &logfloat@nbits@_@oper@_spec) < 0) {
+        Py_DECREF(ufunc);
+        Py_DECREF(numpy);
+        return -1;
+    }
+
+/**end repeat1**/
+
+    Py_DECREF(ufunc);
+
+/**end repeat**/
+
+    Py_DECREF(numpy);
+    return 0;
+}
