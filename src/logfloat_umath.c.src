@@ -15,8 +15,7 @@
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // The first template loop defines the C functions that operate on the
-// log values.  No Python or NumPy API is involved in the in this
-// template loop.
+// log values.  No Python or NumPy API is involved in this template loop.
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 /**begin repeat
@@ -25,6 +24,10 @@
  * #ctype = float, double#
  * #suffix = f, #
  */
+
+//
+// Binary operations...
+//
 
 //
 // Compute log(exp(log1) + exp(log2))
@@ -111,41 +114,11 @@ logfloat@nbits@_log_power(@ctype@ log1, @ctype@ log2)
     return value2*log1;
 }
 
-//
-// Compute +log1
-//
-/* Currently unused.
-static @ctype@
-logfloat@nbits@_log_positive(@ctype@ log1)
-{
-    return log1;
-}
-*/
-
 /**end repeat**/
 
 
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-// In these nested template loops, the `resolve_descriptors` and
-// `strided loop` functions are defined.
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-// Note: The `stride_loop` functions assume that the values stored in
-// the input arrays are in native byte order.
-
-/**begin repeat
- *
- * #nbits = 32, 64#
- * #ctype = float, double#
- * #suffix = f, #
- */
-
-/**begin repeat1
- * #oper = add, subtract, multiply, true_divide, power #
- */
-
 static NPY_CASTING
-logfloat@nbits@_@oper@_resolve_descriptors(
+generic_binary_resolve_descriptors(
     PyObject *self,
     PyArray_DTypeMeta *dtypes[],
     PyArray_Descr *given_descrs[],
@@ -165,6 +138,25 @@ logfloat@nbits@_@oper@_resolve_descriptors(
     }
     return NPY_NO_CASTING;
 }
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// In these nested template loops, the strided loop functions
+// are defined.
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+// Note: The `strided_loop` functions assume that the values stored in
+// the input arrays are in native byte order.
+
+/**begin repeat
+ *
+ * #nbits = 32, 64#
+ * #ctype = float, double#
+ * #suffix = f, #
+ */
+
+/**begin repeat1
+ * #oper = add, subtract, multiply, true_divide, power #
+ */
 
 static int
 logfloat@nbits@_@oper@_strided_loop(
@@ -236,7 +228,7 @@ init_logfloat_ufuncs(void)
  */
 
     static PyType_Slot logfloat@nbits@_@oper@_slots[] = {
-        {NPY_METH_resolve_descriptors, &logfloat@nbits@_@oper@_resolve_descriptors},
+        {NPY_METH_resolve_descriptors, &generic_binary_resolve_descriptors},
         {NPY_METH_strided_loop, &logfloat@nbits@_@oper@_strided_loop},
         {0, NULL}
     };
