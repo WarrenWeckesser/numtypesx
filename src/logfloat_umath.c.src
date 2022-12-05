@@ -1,5 +1,8 @@
 #include <Python.h>
 
+#include <stdbool.h>
+#include <math.h>
+
 #define PY_ARRAY_UNIQUE_SYMBOL numtypesx_ARRAY_API
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #define NO_IMPORT_ARRAY
@@ -24,6 +27,104 @@
  * #ctype = float, double#
  * #suffix = f, #
  */
+
+//
+// Unary operations...
+//
+
+//
+// `positive` unary operation.
+//
+static @ctype@
+logfloat@nbits@_positive(@ctype@ log1)
+{
+    return log1;
+}
+
+//
+// `absolute` unary operation.
+//
+// For the logfloat types, this is the same as "positive",
+// because there are no negative values.
+//
+static @ctype@
+logfloat@nbits@_absolute(@ctype@ log1)
+{
+    return log1;
+}
+
+//
+// `sign` unary operation.
+//
+// The sign ufunc returns the same dtype as the input.
+// So this function returns the log of the sign of the
+// floating point value that whose log is log1.  For values
+// of log1 except -INFINITY, the return value is 0.0.
+//
+static @ctype@
+logfloat@nbits@_sign(@ctype@ log1)
+{
+    if (log1 == -INFINITY) {
+        return -INFINITY;
+    }
+    else {
+        return 0.0;
+    }
+}
+
+//
+// `square` unary operation
+//
+static @ctype@
+logfloat@nbits@_square(@ctype@ log1)
+{
+    return 2*log1;
+}
+
+//
+// `sqrt` unary operation.
+//
+static @ctype@
+logfloat@nbits@_sqrt(@ctype@ log1)
+{
+    return log1/2;
+}
+
+//
+// `cbrt` unary operation.
+//
+static @ctype@
+logfloat@nbits@_cbrt(@ctype@ log1)
+{
+    return log1/3;
+}
+
+//
+// `reciprocal` unary operation.
+//
+static @ctype@
+logfloat@nbits@_reciprocal(@ctype@ log1)
+{
+    return -log1;
+}
+
+//
+// `isfinite` unary operation.
+//
+static bool
+logfloat@nbits@_isfinite(@ctype@ log1)
+{
+    return (log1 == -INFINITY) || isfinite(log1);
+}
+
+//
+// `isinf` unary operation.
+//
+static bool
+logfloat@nbits@_isinf(@ctype@ log1)
+{
+    return isinf@suffix@(log1) && (log1 > 0.0);
+}
 
 //
 // Binary operations...
@@ -118,6 +219,26 @@ logfloat@nbits@_log_power(@ctype@ log1, @ctype@ log2)
 
 
 static NPY_CASTING
+generic_unary_resolve_descriptors(
+    PyObject *self,
+    PyArray_DTypeMeta *dtypes[],
+    PyArray_Descr *given_descrs[],
+    PyArray_Descr *loop_descrs[],
+    npy_intp *unused
+)
+{
+    Py_INCREF(given_descrs[0]);
+    loop_descrs[0] = given_descrs[0];
+ 
+    if (given_descrs[1] == NULL) {
+        Py_INCREF(given_descrs[0]);
+        loop_descrs[1] = given_descrs[0];
+    }
+    return NPY_NO_CASTING;
+}
+
+
+static NPY_CASTING
 generic_binary_resolve_descriptors(
     PyObject *self,
     PyArray_DTypeMeta *dtypes[],
@@ -153,6 +274,71 @@ generic_binary_resolve_descriptors(
  * #ctype = float, double#
  * #suffix = f, #
  */
+
+// Unary operators, logfloat## -> logfloat##
+
+/**begin repeat1
+ *
+ * #oper = positive, absolute, sign, square, sqrt, cbrt, reciprocal #
+ */
+
+static int
+logfloat@nbits@_@oper@_strided_loop(
+    PyArrayMethod_Context *context,
+    char *const args[],
+    npy_intp const dimensions[],
+    npy_intp const strides[],
+    NpyAuxData *auxdata)
+{
+    char *in1 = args[0];
+    char *out = args[1];
+    npy_intp n = dimensions[0];
+    npy_intp in1_stride = strides[0];
+    npy_intp out_stride = strides[1];
+
+    for (npy_intp k = 0; k < n; ++k, in1 += in1_stride,
+                                     out += out_stride) {
+        @ctype@ x = *(@ctype@ *) in1;
+        *(@ctype@ *) out = logfloat@nbits@_@oper@(x);
+    }
+
+    return 0;
+}
+
+/**end repeat1**/
+
+// Boolean unary operators, logfloat## -> bool
+
+/**begin repeat1
+ *
+ * #oper = isinf, isfinite #
+ */
+
+static int
+logfloat@nbits@_@oper@_strided_loop(
+    PyArrayMethod_Context *context,
+    char *const args[],
+    npy_intp const dimensions[],
+    npy_intp const strides[],
+    NpyAuxData *auxdata)
+{
+    char *in1 = args[0];
+    char *out = args[1];
+    npy_intp n = dimensions[0];
+    npy_intp in1_stride = strides[0];
+    npy_intp out_stride = strides[1];
+
+    for (npy_intp k = 0; k < n; ++k, in1 += in1_stride,
+                                     out += out_stride) {
+        @ctype@ x = *(@ctype@ *) in1;
+        *(bool *) out = logfloat@nbits@_@oper@(x);
+    }
+
+    return 0;
+}
+
+/**end repeat1**/
+
 
 /**begin repeat1
  * #oper = add, subtract, multiply, true_divide, power #
@@ -200,17 +386,114 @@ init_logfloat_ufuncs(void)
         return -1;
     }
 
-    static PyArray_DTypeMeta *logfloat32_dtypes[3] = {
-        &LogFloat32DType_Type,
-        &LogFloat32DType_Type,
+    // NOTE: The arrays logfloat32_dtypes and logfloat64_dtypes are
+    // used when creating both the unary and binary ufuncs.
+
+/**begin repeat
+ * #nbits = 32, 64#
+ */
+
+    PyArray_DTypeMeta *logfloat@nbits@_dtypes[3] = {
+        &LogFloat@nbits@DType_Type,
+        &LogFloat@nbits@DType_Type,
         &LogFloat32DType_Type,
     };
 
-    static PyArray_DTypeMeta *logfloat64_dtypes[3] = {
-        &LogFloat64DType_Type,
-        &LogFloat64DType_Type,
-        &LogFloat64DType_Type,
+    PyArray_DTypeMeta *logfloat@nbits@_unary_bool_dtypes[2] = {
+        &LogFloat@nbits@DType_Type,
+        &PyArray_BoolDType,
     };
+
+    PyArray_DTypeMeta *logfloat@nbits@_binary_bool_dtypes[3] = {
+        &LogFloat@nbits@DType_Type,
+        &LogFloat@nbits@DType_Type,
+        &PyArray_BoolDType,
+    };
+
+/**end repeat**/
+
+/**begin repeat
+ * #oper = isinf, isfinite #
+ */
+
+    ufunc = PyObject_GetAttrString(numpy, "@oper@");
+    if (ufunc == NULL) {
+        Py_DECREF(numpy);
+        return -1;
+    }
+
+/**begin repeat1
+ * #nbits = 32, 64#
+ */
+
+    static PyType_Slot logfloat@nbits@_@oper@_slots[] = {
+        {NPY_METH_strided_loop, &logfloat@nbits@_@oper@_strided_loop},
+        {0, NULL}
+    };
+
+    PyArrayMethod_Spec logfloat@nbits@_@oper@_spec = {
+        .name = "logfloat@nbits@_@oper@",
+        .nin = 1,
+        .nout = 1,
+        .dtypes = logfloat@nbits@_unary_bool_dtypes,
+        .slots = logfloat@nbits@_@oper@_slots,
+        .flags = 0,
+        .casting = NPY_NO_CASTING,
+    };
+
+    if (PyUFunc_AddLoopFromSpec(ufunc, &logfloat@nbits@_@oper@_spec) < 0) {
+        Py_DECREF(ufunc);
+        Py_DECREF(numpy);
+        return -1;
+    }
+
+/**end repeat1**/
+
+    Py_DECREF(ufunc);
+
+/**end repeat**/
+
+/**begin repeat
+ * #oper = positive, absolute, sign, square, sqrt, cbrt, reciprocal#
+ */
+
+    ufunc = PyObject_GetAttrString(numpy, "@oper@");
+    if (ufunc == NULL) {
+        Py_DECREF(numpy);
+        return -1;
+    }
+
+/**begin repeat1
+ * #nbits = 32, 64#
+ */
+
+    static PyType_Slot logfloat@nbits@_@oper@_slots[] = {
+        {NPY_METH_resolve_descriptors, &generic_unary_resolve_descriptors},
+        {NPY_METH_strided_loop, &logfloat@nbits@_@oper@_strided_loop},
+        {0, NULL}
+    };
+
+    PyArrayMethod_Spec logfloat@nbits@_@oper@_spec = {
+        .name = "logfloat@nbits@_@oper@",
+        .nin = 1,
+        .nout = 1,
+        .dtypes = logfloat@nbits@_dtypes,
+        .slots = logfloat@nbits@_@oper@_slots,
+        .flags = 0,
+        .casting = NPY_NO_CASTING,
+    };
+
+    if (PyUFunc_AddLoopFromSpec(ufunc, &logfloat@nbits@_@oper@_spec) < 0) {
+        Py_DECREF(ufunc);
+        Py_DECREF(numpy);
+        return -1;
+    }
+
+/**end repeat1**/
+
+    Py_DECREF(ufunc);
+
+/**end repeat**/
 
 /**begin repeat
  * #oper = add, subtract, multiply, true_divide, power #
