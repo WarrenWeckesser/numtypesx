@@ -20,21 +20,24 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get install libopenblas-dev
-        python -m pip install --upgrade pip wheel
-        python -m pip install --upgrade setuptools==59.8.0
-        python -m pip install meson ninja meson-python pytest toml
         pushd .
         cd ..
         git clone --shallow-submodules --recurse-submodules --depth 1 https://github.com/numpy/numpy.git
         cd numpy
+        python -m pip install -r build_requirements.txt
+        #
         # We have a shallow clone of the main branch of NumPy, which has no
         # git tags.  The code in versioneer.py requires a tag to create a
         # version, so create a tag with a blatantly fake version number.
+        #
         git config user.email "foo@example.com"
         git config user.name "Foo"
         git tag -a v999.0.0 -m "NumPy main development branch"
         python -m pip install --no-build-isolation .
         popd
+        #
+        python -m pip install pytest toml
+        #
     - name: Install numtypesx
       run: |
         export NUMPY_EXPERIMENTAL_DTYPE_API=1
