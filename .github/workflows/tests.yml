@@ -8,20 +8,19 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        # python-version: ['3.9', '3.10', '3.11']
         python-version: ['3.9', '3.10', '3.11']
 
     steps:
     - uses: actions/checkout@v4
     - name: Set up ${{ matrix.python-version }}
       uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
+      with:        export NUMPY_EXPERIMENTAL_DTYPE_API=1
+
         sudo apt-get install libopenblas-dev
         python -m pip install --upgrade pip wheel
         python -m pip install --upgrade setuptools==59.8.0
-        python -m pip install meson-python pytest toml
+        python -m pip install meson ninja meson-python pytest toml
         pushd .
         cd ..
         git clone --shallow-submodules --recurse-submodules --depth 1 https://github.com/numpy/numpy.git
@@ -32,9 +31,9 @@ jobs:
         git config user.email "foo@example.com"
         git config user.name "Foo"
         git tag -a v999.0.0 -m "NumPy main development branch"
-        python -m pip install .
+        python -m pip install --no-build-isolation .
         popd
-    - name: Install numtypes
+    - name: Install numtypesx
       run: |
         export NUMPY_EXPERIMENTAL_DTYPE_API=1
         python -m pip install --no-build-isolation .
