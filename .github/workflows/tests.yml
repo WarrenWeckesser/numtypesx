@@ -44,4 +44,5 @@ jobs:
         python -m pip install --no-build-isolation .
     - name: Test with pytest
       run: |
+        export NUMPY_EXPERIMENTAL_DTYPE_API=1
         pytest --pyargs numtypesx
