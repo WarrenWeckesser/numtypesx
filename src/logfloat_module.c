@@ -12,19 +12,19 @@
 
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
-    .m_name = "numtypesx_module",
+    .m_name = "_logfloat",
     .m_size = -1,
 };
 
 //
 // Module initialization function
 //
-PyMODINIT_FUNC PyInit__numtypesx_module(void)
+PyMODINIT_FUNC PyInit__logfloat(void)
 {
     if (_import_array() < 0) {
         return NULL;
     }
-    if (import_experimental_dtype_api(5) < 0) {
+    if (import_experimental_dtype_api(13) < 0) {
         return NULL;
     }
 

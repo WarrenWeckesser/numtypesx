@@ -404,11 +404,13 @@ init_logfloat_ufuncs(void)
         &PyArray_BoolDType,
     };
 
+    /*
     PyArray_DTypeMeta *logfloat@nbits@_binary_bool_dtypes[3] = {
         &LogFloat@nbits@DType_Type,
         &LogFloat@nbits@DType_Type,
         &PyArray_BoolDType,
     };
+    */
 
 /**end repeat**/
 
