@@ -260,6 +260,29 @@ generic_binary_resolve_descriptors(
     return NPY_NO_CASTING;
 }
 
+static NPY_CASTING
+comparison_resolve_descriptors(
+    PyObject *self,
+    PyArray_DTypeMeta *dtypes[],
+    PyArray_Descr *given_descrs[],
+    PyArray_Descr *loop_descrs[],
+    npy_intp *unused
+)
+{
+    // The logfloat types are not parametrized, so we assume that
+    // given_descrs[0] and given_descrs[1] are the same.
+    Py_INCREF(given_descrs[0]);
+    loop_descrs[0] = given_descrs[0];
+    Py_INCREF(given_descrs[1]);
+    loop_descrs[1] = given_descrs[1];
+    if (given_descrs[2] == NULL) {
+        PyArray_Descr *bool_descr = PyArray_DescrFromType(NPY_BOOL);
+        loop_descrs[2] = bool_descr;
+        // XXX Py_INCREF(bool_descr); ???
+    }
+    return NPY_NO_CASTING;
+}
+
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // In these nested template loops, the strided loop functions
 // are defined.
@@ -373,6 +396,40 @@ logfloat@nbits@_@oper@_strided_loop(
 
 /**end repeat1**/
 
+/**begin repeat1
+ * #opname = equal, not_equal, less, less_equal, greater, greater_equal #
+ * #op     = ==,    !=,        <,    <=,         >,       >=            #
+ */
+
+static int
+logfloat@nbits@_@opname@_strided_loop(
+    PyArrayMethod_Context *context,
+    char *const args[],
+    npy_intp const dimensions[],
+    npy_intp const strides[],
+    NpyAuxData *auxdata)
+{
+    char *in1 = args[0];
+    char *in2 = args[1];
+    char *out = args[2];
+    npy_intp n = dimensions[0];
+    npy_intp in1_stride = strides[0];
+    npy_intp in2_stride = strides[1];
+    npy_intp out_stride = strides[2];
+
+    for (npy_intp k = 0; k < n; ++k, in1 += in1_stride,
+                                     in2 += in2_stride,
+                                     out += out_stride) {
+        @ctype@ x = *(@ctype@ *) in1;
+        @ctype@ y = *(@ctype@ *) in2;
+        *(npy_bool *) out = x @op@ y;
+    }
+
+    return 0;
+}
+
+/**end repeat1**/
+
 /**end repeat**/
 
 
@@ -404,13 +461,11 @@ init_logfloat_ufuncs(void)
         &PyArray_BoolDType,
     };
 
-    /*
     PyArray_DTypeMeta *logfloat@nbits@_binary_bool_dtypes[3] = {
         &LogFloat@nbits@DType_Type,
         &LogFloat@nbits@DType_Type,
         &PyArray_BoolDType,
     };
-    */
 
 /**end repeat**/
 
@@ -523,6 +578,49 @@ init_logfloat_ufuncs(void)
         .nin = 2,
         .nout = 1,
         .dtypes = logfloat@nbits@_dtypes,
+        .slots = logfloat@nbits@_@oper@_slots,
+        .flags = 0,
+        .casting = NPY_NO_CASTING,
+    };
+
+    if (PyUFunc_AddLoopFromSpec(ufunc, &logfloat@nbits@_@oper@_spec) < 0) {
+        Py_DECREF(ufunc);
+        Py_DECREF(numpy);
+        return -1;
+    }
+
+/**end repeat1**/
+
+    Py_DECREF(ufunc);
+
+/**end repeat**/
+
+/**begin repeat
+ * #oper = equal, not_equal, less, less_equal, greater, greater_equal #
+ */
+
+    ufunc = PyObject_GetAttrString(numpy, "@oper@");
+    if (ufunc == NULL) {
+        Py_DECREF(numpy);
+        return -1;
+    }
+
+/**begin repeat1
+ *
+ * #nbits = 32, 64#
+ */
+
+    static PyType_Slot logfloat@nbits@_@oper@_slots[] = {
+        {NPY_METH_resolve_descriptors, &comparison_resolve_descriptors},
+        {NPY_METH_strided_loop, &logfloat@nbits@_@oper@_strided_loop},
+        {0, NULL}
+    };
+
+    PyArrayMethod_Spec logfloat@nbits@_@oper@_spec = {
+        .name = "logfloat@nbits@_@oper@",
+        .nin = 2,
+        .nout = 1,
+        .dtypes = logfloat@nbits@_binary_bool_dtypes,
         .slots = logfloat@nbits@_@oper@_slots,
         .flags = 0,
         .casting = NPY_NO_CASTING,
