@@ -123,7 +123,7 @@ logfloat@nbits@_isfinite(@ctype@ log1)
 static bool
 logfloat@nbits@_isinf(@ctype@ log1)
 {
-    return isinf@suffix@(log1) && (log1 > 0.0);
+    return isinf(log1) && (log1 > 0.0);
 }
 
 //
