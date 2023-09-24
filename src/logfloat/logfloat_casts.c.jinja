@@ -10,14 +10,9 @@
 #include "logfloat_casts.h"
 #include "logfloat_dtype.h"
 
-/**begin repeat
- *
- * #nbits = 32, 64#
- * #ctype = float, double#
- * #suffix = f, #
- */
+{% for nbits, ctype, suffix in [('32', 'float', 'f'), ('64', 'double', '')] %}
 
-static NPY_CASTING logfloat@nbits@_to_logfloat@nbits@_resolve_descriptors(
+static NPY_CASTING logfloat{= nbits =}_to_logfloat{= nbits =}_resolve_descriptors(
     PyObject* NPY_UNUSED(self),
     PyArray_DTypeMeta* NPY_UNUSED(dtypes[2]),
     PyArray_Descr* given_descrs[2],
@@ -39,7 +34,7 @@ static NPY_CASTING logfloat@nbits@_to_logfloat@nbits@_resolve_descriptors(
     return NPY_NO_CASTING;
 }
 
-static int logfloat@nbits@_to_logfloat@nbits@_contiguous(
+static int logfloat{= nbits =}_to_logfloat{= nbits =}_contiguous(
     PyArrayMethod_Context *NPY_UNUSED(context),
     char* const data[],
     npy_intp const dimensions[],
@@ -50,12 +45,12 @@ static int logfloat@nbits@_to_logfloat@nbits@_contiguous(
     char *in = data[0];
     char *out = data[1];
 
-    memcpy(out, in, n*sizeof(@ctype@));
+    memcpy(out, in, n*sizeof({= ctype =}));
 
     return 0;
 }
 
-static int logfloat@nbits@_to_logfloat@nbits@_strided(
+static int logfloat{= nbits =}_to_logfloat{= nbits =}_strided(
     PyArrayMethod_Context *NPY_UNUSED(context),
     char* const data[],
     npy_intp const dimensions[],
@@ -69,7 +64,7 @@ static int logfloat@nbits@_to_logfloat@nbits@_strided(
     npy_intp out_stride = strides[1];
 
     while (n) {
-        *((@ctype@ *) in) = *((@ctype@ *) out);
+        *(({= ctype =} *) in) = *(({= ctype =} *) out);
         in += in_stride;
         out += out_stride;
         --n;
@@ -78,7 +73,7 @@ static int logfloat@nbits@_to_logfloat@nbits@_strided(
     return 0;
 }
 
-static int logfloat@nbits@_to_logfloat@nbits@_unaligned(
+static int logfloat{= nbits =}_to_logfloat{= nbits =}_unaligned(
     PyArrayMethod_Context *NPY_UNUSED(context),
     char* const data[],
     npy_intp const dimensions[],
@@ -92,7 +87,7 @@ static int logfloat@nbits@_to_logfloat@nbits@_unaligned(
     npy_intp out_stride = strides[1];
 
     while (n) {
-        *((@ctype@ *) in) = *((@ctype@ *) out);
+        *(({= ctype =} *) in) = *(({= ctype =} *) out);
         in += in_stride;
         out += out_stride;
         --n;
@@ -108,7 +103,7 @@ static int logfloat@nbits@_to_logfloat@nbits@_unaligned(
 // * `contiguous_inner_loop`
 // * `unaligned_strided_loop`
 // * ...
-static int logfloat@nbits@_to_logfloat@nbits@_get_loop(
+static int logfloat{= nbits =}_to_logfloat{= nbits =}_get_loop(
     PyArrayMethod_Context* context,
     int aligned,
     int NPY_UNUSED(move_references),
@@ -117,16 +112,16 @@ static int logfloat@nbits@_to_logfloat@nbits@_get_loop(
     NpyAuxData** out_transferdata,
     NPY_ARRAYMETHOD_FLAGS* flags
 ) {
-    int contig = (strides[0] == sizeof(@ctype@) && strides[1] == sizeof(@ctype@));
+    int contig = (strides[0] == sizeof({= ctype =}) && strides[1] == sizeof({= ctype =}));
 
     if (aligned && contig) {
-        *out_loop = (PyArrayMethod_StridedLoop*) &logfloat@nbits@_to_logfloat@nbits@_contiguous;
+        *out_loop = (PyArrayMethod_StridedLoop*) &logfloat{= nbits =}_to_logfloat{= nbits =}_contiguous;
     }
     else if (aligned) {
-        *out_loop = (PyArrayMethod_StridedLoop*) &logfloat@nbits@_to_logfloat@nbits@_strided;
+        *out_loop = (PyArrayMethod_StridedLoop*) &logfloat{= nbits =}_to_logfloat{= nbits =}_strided;
     }
     else {
-        *out_loop = (PyArrayMethod_StridedLoop*) &logfloat@nbits@_to_logfloat@nbits@_unaligned;
+        *out_loop = (PyArrayMethod_StridedLoop*) &logfloat{= nbits =}_to_logfloat{= nbits =}_unaligned;
     }
 
     *flags = 0;
@@ -137,23 +132,23 @@ static int logfloat@nbits@_to_logfloat@nbits@_get_loop(
  * NumPy currently allows NULL for the own DType/"cls".  For other DTypes
  * we would have to fill it in here:
  */
-static PyArray_DTypeMeta* LogFloat@nbits@_to_LogFloat@nbits@_DTypes[2] = { NULL, NULL };
+static PyArray_DTypeMeta* LogFloat{= nbits =}_to_LogFloat{= nbits =}_DTypes[2] = { NULL, NULL };
 
-static PyType_Slot LogFloat@nbits@_to_LogFloat@nbits@_Slots[] = {
-    { NPY_METH_resolve_descriptors, &logfloat@nbits@_to_logfloat@nbits@_resolve_descriptors },
-    { _NPY_METH_get_loop, &logfloat@nbits@_to_logfloat@nbits@_get_loop },
+static PyType_Slot LogFloat{= nbits =}_to_LogFloat{= nbits =}_Slots[] = {
+    { NPY_METH_resolve_descriptors, &logfloat{= nbits =}_to_logfloat{= nbits =}_resolve_descriptors },
+    { _NPY_METH_get_loop, &logfloat{= nbits =}_to_logfloat{= nbits =}_get_loop },
     { 0, NULL }
 };
 
 
-PyArrayMethod_Spec LogFloat@nbits@_to_LogFloat@nbits@_CastSpec = {
-    .name = "cast_LogFloat@nbits@DType_to_LogFloat@nbits@DType",
+PyArrayMethod_Spec LogFloat{= nbits =}_to_LogFloat{= nbits =}_CastSpec = {
+    .name = "cast_LogFloat{= nbits =}DType_to_LogFloat{= nbits =}DType",
     .nin = 1,
     .nout = 1,
     .flags = NPY_METH_SUPPORTS_UNALIGNED,
     .casting = NPY_NO_CASTING,
-    .dtypes = LogFloat@nbits@_to_LogFloat@nbits@_DTypes,
-    .slots = LogFloat@nbits@_to_LogFloat@nbits@_Slots,
+    .dtypes = LogFloat{= nbits =}_to_LogFloat{= nbits =}_DTypes,
+    .slots = LogFloat{= nbits =}_to_LogFloat{= nbits =}_Slots,
 };
 
-/**end repeat**/
+{% endfor %}

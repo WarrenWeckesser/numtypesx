@@ -1,0 +1,279 @@
+#include <Python.h>
+
+#define PY_ARRAY_UNIQUE_SYMBOL numtypesx_ARRAY_API
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#define NO_IMPORT_ARRAY
+#include "numpy/arrayobject.h"
+#include "numpy/ndarraytypes.h"
+#include "numpy/experimental_dtype_api.h"
+
+#include "logfloat_scalar.h"
+#include "logfloat_casts.h"
+#include "logfloat_dtype.h"
+
+#include <stdio.h>
+#include <math.h>
+
+
+//
+// Compute the log of value.  Return NAN if value < 0 or
+// -INFINITY if value == 0, without flagging an error.
+//
+static double
+log_no_fp_error(double value)
+{
+    if (value < 0.0) {
+        return NAN;
+    }
+    if (value == 0.0) {
+        return -INFINITY;
+    }
+    return log(value);
+}
+
+{% for nbits, ctype, suffix in [('32', 'float', 'f'), ('64', 'double', '')] %}
+
+PyArray_DTypeMeta LogFloat{= nbits =}DType_Type;
+
+//
+// Internal helper to create new dtype instances.
+//
+LogFloat{= nbits =}DTypeObject *
+new_logfloat{= nbits =}dtype_instance(void)
+{
+    LogFloat{= nbits =}DTypeObject *new = (LogFloat{= nbits =}DTypeObject *)PyArrayDescr_Type.tp_new(
+            (PyTypeObject *) &LogFloat{= nbits =}DType_Type, NULL, NULL);
+    if (new == NULL) {
+        return NULL;
+    }
+    new->base.elsize = sizeof({= ctype =});
+    new->base.alignment = _Alignof({= ctype =});
+
+    return new;
+}
+
+//
+// DType slots
+//
+
+//
+// slot: NPY_DT_common_instance
+//
+/*
+static LogFloat{= nbits =}DTypeObject *
+logfloat{= nbits =}_common_instance(LogFloat{= nbits =}DTypeObject *dtype1,
+                                    LogFloat{= nbits =}DTypeObject *dtype2)
+{
+    Py_INCREF(dtype1);
+    return dtype1;
+}
+*/
+
+//
+// slot: NPY_DT_common_dtype
+//
+static PyArray_DTypeMeta *
+logfloat{= nbits =}_common_dtype(PyArray_DTypeMeta *cls, PyArray_DTypeMeta *other)
+{
+    /*
+     * Typenum is useful for NumPy, but there it can still be convenient.
+     * (New-style user dtypes will probably get -1 as type number...)
+     */
+    if (other->type_num >= 0
+            && PyTypeNum_ISNUMBER(other->type_num)
+            && !PyTypeNum_ISCOMPLEX(other->type_num)
+            && other != &PyArray_LongDoubleDType) {
+        /*
+         * A (simple) builtin numeric type that is not a complex or longdouble
+         * will always promote to the Double Unit (cls).
+         */
+        Py_INCREF(cls);
+        return cls;
+    }
+    Py_INCREF(Py_NotImplemented);
+    return (PyArray_DTypeMeta *)Py_NotImplemented;
+}
+
+//
+// slot: NPT_DT_ensure_canonical
+//
+static PyObject *
+logfloat{= nbits =}_ensure_canonical(LogFloat{= nbits =}DTypeObject *descr)
+{
+    // XXX This is supposed to set the 'canonical' flag...
+    //
+    // Does this need an INCREF?
+    Py_INCREF(descr);
+    return (PyObject *) descr;
+}
+
+
+//
+// get_{= ctype =}_log_from_object attempts to get the log value
+// as a C type from a given Python object.
+// On return *perror is 0 on success, or -1 on error.
+//
+static {= ctype =}
+get_{= ctype =}_log_from_object(PyObject *o, int *perror)
+{
+    *perror = 0;
+
+    if (PyObject_IsInstance(o, (PyObject *) &LogFloat32Scalar_Type)) {
+        return ({= ctype =}) ((LogFloat32Scalar *) o)->log;
+    }
+    else if (PyObject_IsInstance(o, (PyObject *) &LogFloat64Scalar_Type)) {
+        return ({= ctype =}) ((LogFloat64Scalar *) o)->log;
+    }
+    else {
+        double value = PyFloat_AsDouble(o);
+        if (value == -1.0 && PyErr_Occurred()) {
+            *perror = -1;
+            return -1.0;
+        }
+        return ({= ctype =}) log_no_fp_error(value);
+    }
+}
+
+//
+// slot: NPY_DT_setitem
+//
+static int
+logfloat{= nbits =}_setitem(LogFloat{= nbits =}DTypeObject *descr, PyObject *obj, char *dataptr)
+{
+    // TODO: accept more types.
+    /*
+    if (Py_TYPE(obj) != &LogFloat{= nbits =}Scalar_Type) {
+        PyErr_SetString(PyExc_TypeError,
+                "Can only store LogFloat{= nbits =}Scalar in a LogFloat{= nbits =} array.");
+        return -1;
+    }
+    {= ctype =} log = ((LogFloat{= nbits =}Scalar *) obj)->log;
+    *({= ctype =} *) dataptr = log;
+    return 0;
+    */
+
+    int error;
+
+    {= ctype =} log = get_{= ctype =}_log_from_object(obj, &error);
+    if (error) {
+        PyErr_SetString(PyExc_TypeError,
+                "Cannot convert ??? to LogFloat{= nbits =}.");
+        return -1;
+    }
+    *({= ctype =} *) dataptr = log;
+    return 0;
+}
+
+//
+// slot: NPY_DT_getitem
+//
+static PyObject *
+logfloat{= nbits =}_getitem(LogFloat{= nbits =}DTypeObject *descr, char *dataptr)
+{
+    LogFloat{= nbits =}Scalar *new = PyObject_New(LogFloat{= nbits =}Scalar,
+                                                  &LogFloat{= nbits =}Scalar_Type);
+    if (new == NULL) {
+        return NULL;
+    }
+    new->log = *({= ctype =} *) dataptr;
+    return (PyObject *) new;
+}
+
+
+//
+// According to NEP 42, nonparametric dtypes do not have to implement
+// `discover_descr_from_pyobject`, `common_instance` and `ensure_canonical`,
+// but in the current main development branch, `ensure_canonical` is required.
+//
+static PyType_Slot LogFloat{= nbits =}DType_Slots[] = {
+    // {NPY_DT_common_instance, &logfloat{= nbits =}_common_instance},
+    {NPY_DT_common_dtype, &logfloat{= nbits =}_common_dtype},
+    {NPY_DT_ensure_canonical, &logfloat{= nbits =}_ensure_canonical},
+    {NPY_DT_setitem, &logfloat{= nbits =}_setitem},
+    {NPY_DT_getitem, &logfloat{= nbits =}_getitem},
+    {0, NULL}
+};
+
+
+//
+// Python type methods for the LogFloat{= nbits =} type.
+//
+
+//
+// .tp_new
+//
+static PyObject *
+logfloat{= nbits =}dtype_new(PyTypeObject *NPY_UNUSED(cls), PyObject *args, PyObject *kwds)
+{
+    PyObject *res = (PyObject *) new_logfloat{= nbits =}dtype_instance();
+    return res;
+}
+
+
+//
+// .tp_dealloc
+//
+static void
+logfloat{= nbits =}dtype_dealloc(LogFloat{= nbits =}DTypeObject *self)
+{
+    PyArrayDescr_Type.tp_dealloc((PyObject *) self);
+}
+
+
+//
+// .tp_repr and .tp_str
+//
+static PyObject *
+logfloat{= nbits =}dtype_repr(LogFloat{= nbits =}DTypeObject *self)
+{
+    // FIXME: Don't need PyUnicode_FromFormat() here.
+    PyObject *res = PyUnicode_FromFormat("LogFloat{= nbits =}");
+    return res;
+}
+
+
+PyArray_DTypeMeta LogFloat{= nbits =}DType_Type = {{{
+        PyVarObject_HEAD_INIT(NULL, 0)
+        .tp_name      = "numtypesx.LogFloat{= nbits =}",
+        .tp_basicsize = sizeof(LogFloat{= nbits =}DTypeObject),
+        .tp_new       = logfloat{= nbits =}dtype_new,
+        .tp_dealloc   = (destructor) logfloat{= nbits =}dtype_dealloc,
+        .tp_repr      = (reprfunc) logfloat{= nbits =}dtype_repr,
+        .tp_str       = (reprfunc) logfloat{= nbits =}dtype_repr,
+    }},
+    /* rest, filled in during DTypeMeta initialization */
+};
+
+
+int
+init_logfloat{= nbits =}_dtype(void)
+{
+    PyArrayMethod_Spec* casts[] = {
+        &LogFloat{= nbits =}_to_LogFloat{= nbits =}_CastSpec,
+        NULL,
+    };
+
+    PyArrayDTypeMeta_Spec LogFloat{= nbits =}DType_DTypeSpec = {
+        .casts = casts,
+        .typeobj = &LogFloat{= nbits =}Scalar_Type,
+        .slots   = LogFloat{= nbits =}DType_Slots,
+    };
+
+    ((PyObject *) &LogFloat{= nbits =}DType_Type)->ob_type = &PyArrayDTypeMeta_Type;
+    ((PyTypeObject *) &LogFloat{= nbits =}DType_Type)->tp_base = &PyArrayDescr_Type;
+    if (PyType_Ready((PyTypeObject *) &LogFloat{= nbits =}DType_Type) < 0) {
+        return -1;
+    }
+
+    if (PyArrayInitDTypeMeta_FromSpec(&LogFloat{= nbits =}DType_Type,
+                                      &LogFloat{= nbits =}DType_DTypeSpec) < 0) {
+        return -1;
+    }
+
+    LogFloat{= nbits =}DType_Type.flags = 0;
+
+    LogFloat{= nbits =}DType_Type.singleton = PyArray_GetDefaultDescr(&LogFloat{= nbits =}DType_Type);
+    return 0;
+}
+
+{% endfor %}
