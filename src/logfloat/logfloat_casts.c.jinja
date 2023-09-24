@@ -87,7 +87,7 @@ static int logfloat{= nbits =}_to_logfloat{= nbits =}_unaligned(
     npy_intp out_stride = strides[1];
 
     while (n) {
-        *(({= ctype =} *) in) = *(({= ctype =} *) out);
+        memcpy(out, in, sizeof({= ctype =}));
         in += in_stride;
         out += out_stride;
         --n;
