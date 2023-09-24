@@ -36,7 +36,7 @@ jobs:
         python -m pip install --no-build-isolation .
         popd
         #
-        python -m pip install pytest toml
+        python -m pip install pytest toml Jinja2
         #
     - name: Install numtypesx
       run: |
