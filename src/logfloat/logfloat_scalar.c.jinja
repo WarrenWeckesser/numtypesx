@@ -12,7 +12,11 @@
 
 #include "logfloat_scalar.h"
 
-{% for nbits in ['32', '64'] %}
+{% for nbits, prec in [('32', 'Single'), ('64', 'Double')] %}
+
+#define LOGFLOAT{= nbits =}_DOC \
+  "{= prec =} precision floating point type for positive real numbers " \
+  "that stores the logarithm of the value."
 
 //
 // .tp_new
@@ -79,6 +83,7 @@ static PyGetSetDef LogFloat{= nbits =}Scalar_getset[] = {
 PyTypeObject LogFloat{= nbits =}Scalar_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name      = "numtypesx.LogFloat{= nbits =}Scalar",
+    .tp_doc       = LOGFLOAT{= nbits =}_DOC,
     .tp_basicsize = sizeof(LogFloat{= nbits =}Scalar),
     .tp_new       = LogFloat{= nbits =}Scalar_new,
     .tp_repr      = (reprfunc)LogFloat{= nbits =}Scalar_str,
