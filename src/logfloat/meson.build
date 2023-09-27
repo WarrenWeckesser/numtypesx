@@ -1,7 +1,8 @@
 
 jinja = generator(py,
                   output : '@BASENAME@',
-                  arguments : ['../tools/process_jinja.py', '@INPUT@', '@BUILD_DIR@'])
+                  arguments : ['process_jinja.py', '@INPUT@', '@BUILD_DIR@'],
+                  depends : [process_jinja_py])
 
 processed_jinja = jinja.process('logfloat_casts.c.jinja',
                                 'logfloat_dtype.c.jinja',
