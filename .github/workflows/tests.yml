@@ -82,9 +82,10 @@ jobs:
 
     - name: Install numptypesx
       run: |
-        # export NUMPY_EXPERIMENTAL_DTYPE_API=1
+        set NUMPY_EXPERIMENTAL_DTYPE_API=1
         python -m pip install --no-build-isolation .
 
     - name: Test
       run: |
+        set NUMPY_EXPERIMENTAL_DTYPE_API=1
         pytest --pyargs numtypesx
