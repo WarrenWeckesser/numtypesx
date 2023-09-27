@@ -4,10 +4,13 @@ from jinja2 import Environment, FileSystemLoader
 
 def main(src, destdir):
     basename = path.basename(src)
-    fsl = FileSystemLoader(path.dirname(src))
+    dirname = path.dirname(src)
+    fsl = FileSystemLoader(dirname)
     env = Environment(loader=fsl,
                       variable_start_string='{=',
-                      variable_end_string='=}')
+                      variable_end_string='=}',
+                      trim_blocks=True)
+    env.globals.update(zip=zip)
     tmpl = env.get_template(basename)
     out = tmpl.render()
     out_filename, ext = path.splitext(basename)

@@ -1,0 +1,929 @@
+//
+// Signed integers with the most negative value treated as NAN.
+//
+// Requires C99.
+// Python 3 only.
+//
+
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+
+#include <stdio.h>
+#include <stdint.h>
+#include <inttypes.h>
+#include <stdbool.h>
+#include <math.h>
+#include <structmember.h>
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Signed integers with the most negative value treated as NAN.
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+{% set common = namespace() %}
+{% include 'common.jinja' %}
+
+{% for nbits, ctype, prefix, py_prefix, INTNAN in zip(common.int_nbits,
+                                                      common.int_ctypes,
+                                                      common.int_prefixes,
+                                                      common.py_prefixes,
+                                                      common.int_nans) %}
+
+static inline {= ctype =}
+{= prefix =}_neg({= ctype =} x)
+{
+    if (x == {= INTNAN =}) {
+        return x;
+    }
+    return -x;
+}
+
+
+static inline {= ctype =}
+{= prefix =}_abs({= ctype =} x)
+{
+    if ((x >= 0) || (x == {= INTNAN =}))  {
+        return x;
+    }
+    else {
+        return -x;
+    }
+}
+
+
+static inline {= ctype =}
+{= prefix =}_add({= ctype =} x, {= ctype =} y, bool *overflow)
+{
+    if ((x == {= INTNAN =}) || (y == {= INTNAN =})) {
+        return {= INTNAN =};
+    }
+    if ((x > 0 && y > INT{= nbits =}_MAX - x) || (x < 0 && y < {= INTNAN =} + 1 - x)) {
+        *overflow = true;
+    }
+    return x + y;
+}
+
+
+static inline {= ctype =}
+{= prefix =}_subtract({= ctype =} x, {= ctype =} y, bool *overflow)
+{
+    if ((x == {= INTNAN =}) || (y == {= INTNAN =})) {
+        return {= INTNAN =};
+    }
+    if ((x > 0 && y < {= INTNAN =} + 1 + x) || (x < 0 && y > INT{= nbits =}_MAX + x)) {
+        *overflow = true;
+    }
+    return x - y;
+}
+
+
+static inline {= ctype =}
+{= prefix =}_multiply({= ctype =} x, {= ctype =} y, bool *overflow)
+{
+    if ((x == {= INTNAN =}) || (y == {= INTNAN =})) {
+        return {= INTNAN =};
+    }
+    if ((x == 0) || (y == 0)) {
+        return 0;
+    }
+    if ({= prefix =}_abs(x) > (INT{= nbits =}_MAX / {= prefix =}_abs(y))) {
+        *overflow = true;
+    }
+    return x * y;
+}
+
+
+// integer floor division: truncate towards -inf
+// (like Python, not C)
+
+static inline {= ctype =}
+{= prefix =}_floor_divide({= ctype =} x, {= ctype =} y, bool *zero_division)
+{
+    {= ctype =} q;
+
+    if ((x == {= INTNAN =}) || (y == {= INTNAN =})) {
+        return {= INTNAN =};
+    }
+    if (y == 0) {
+        *zero_division = true;
+        return {= INTNAN =};
+    }
+
+    if (y < 0) {
+        y = -y;
+        x = -x;
+    }
+    q = x / y;
+    if ((x < 0) && (y*q != x)) {
+        --q;
+    }
+    return q;
+}
+
+
+static inline double
+{= prefix =}_true_divide({= ctype =} x, {= ctype =} y, bool *zero_division)
+{
+    if ((x == {= INTNAN =}) || (y == {= INTNAN =})) {
+        return NAN;
+    }
+    if (y == 0) {
+        *zero_division = true;
+        return NAN;  // XXX or something else?
+    }
+    return (double) x / y;
+}
+
+/***** UNUSED
+static inline {= ctype =}
+{= prefix =}_minimum({= ctype =} x, {= ctype =} y)
+{
+    if ((x == {= INTNAN =}) || (y == {= INTNAN =})) {
+        return {= INTNAN =};
+    }
+    return (x < y) ? x : y;
+}
+*****/
+
+/***** UNUSED
+static inline {= ctype =}
+{= prefix =}_maximum({= ctype =} x, {= ctype =} y)
+{
+    if ((x == {= INTNAN =}) || (y == {= INTNAN =})) {
+        return {= INTNAN =};
+    }
+    return (x > y) ? x : y;
+}
+*****/
+
+/***** UNUSED
+static inline {= ctype =}
+{= prefix =}_remainder({= ctype =} x, {= ctype =} y, bool *zero_division)
+{
+    if ((x == {= INTNAN =}) || (y == {= INTNAN =})) {
+        return {= INTNAN =};
+    }
+    if (y == 0) {
+        *zero_division = true;
+        return {= INTNAN =};
+    }
+    // XXX Check that this agrees with the expected behavior in Python
+    // with respect to the signs of x and y.
+    return x % y;
+}
+*****/
+
+//
+// XXX {= prefix =}_sign returns {= ctype =}, so that it can return NAN when
+// the input is NAN.  Will this actually work?
+//
+
+/***** UNUSED
+static inline {= ctype =}
+{= prefix =}_sign({= ctype =} x)
+{
+    if (x == {= INTNAN =}) {
+        return x;
+    }
+    return (x == 0 ? 0 : (x > 0 ? 1 : -1));
+}
+
+
+static inline int
+{= prefix =}_eq({= ctype =} x, {= ctype =} y)
+{
+    if ((x == {= INTNAN =}) || (y == {= INTNAN =})) {
+        return 0;
+    }
+    return x == y;
+}
+
+
+static inline int
+{= prefix =}_ne({= ctype =} x, {= ctype =} y)
+{
+    return !{= prefix =}_eq(x, y);
+}
+
+
+static inline int
+{= prefix =}_lt({= ctype =} x, {= ctype =} y)
+{
+    if ((x == {= INTNAN =}) || (y == {= INTNAN =})) {
+        return 0;
+    }
+    return x < y;
+}
+
+
+static inline int
+{= prefix =}_gt({= ctype =} x, {= ctype =} y)
+{
+    if ((x == {= INTNAN =}) || (y == {= INTNAN =})) {
+        return 0;
+    }
+    return x > y;
+}
+
+
+static inline int
+{= prefix =}_le({= ctype =} x, {= ctype =} y)
+{
+    if ((x == {= INTNAN =}) || (y == {= INTNAN =})) {
+        return 0;
+    }
+    return x <= y;
+}
+
+
+static inline int
+{= prefix =}_ge({= ctype =} x, {= ctype =} y)
+{
+    if ((x == {= INTNAN =}) || (y == {= INTNAN =})) {
+        return 0;
+    }
+    return x >= y;   
+}
+*****/
+
+
+/***** UNUSED
+static inline float
+{= prefix =}_as_float({= ctype =} x)
+{
+    if (x == {= INTNAN =}) {
+        return (float) NAN;
+    }
+    return (float) x;
+}
+*****/
+
+static inline double
+{= prefix =}_as_double({= ctype =} x)
+{
+    if (x == {= INTNAN =}) {
+        return (double) NAN;
+    }
+    return (double) x;
+}
+
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Create a Python type.
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+typedef struct {
+    PyObject_HEAD
+    {= ctype =} value;
+} {= py_prefix =};
+
+
+// Forward declaration.
+static PyTypeObject {= py_prefix =}_Type;
+
+
+static inline int
+{= py_prefix =}_Check(PyObject* object)
+{
+    return PyObject_IsInstance(object, (PyObject*) &{= py_prefix =}_Type);
+}
+
+
+static PyObject*
+{= py_prefix =}_from_{= ctype =}({= ctype =} x)
+{
+    {= py_prefix =}* p = ({= py_prefix =}*) {= py_prefix =}_Type.tp_alloc(&{= py_prefix =}_Type, 0);
+    if (p) {
+        p->value = x;
+    }
+    return (PyObject*) p;
+}
+
+
+static int
+{= py_prefix =}_init_argument_error(void)
+{
+    PyErr_SetString(PyExc_TypeError,
+                    "{= prefix =}() argument must be an integer, "
+                    "a floating point nan, a string, "
+                    "or another {= prefix =} instance.");
+    return -1;
+}
+
+
+static int
+{= py_prefix =}_init({= py_prefix =} *self, PyObject *args, PyObject *kwds)
+{
+    static char *kwlist[] = {"value", NULL};
+    PyObject *obj;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O", kwlist, &obj)) {
+        return -1;
+    }
+    Py_INCREF(obj);
+
+    if ({= py_prefix =}_Check(obj)) {
+        self->value = (({= py_prefix =} *) obj)->value;
+        Py_DECREF(obj);
+        return 0;
+    }
+
+    if (PyUnicode_Check(obj)) {
+        // Argument is a string.
+        // Try to convert it to a Python integer.
+        PyObject *tmp = PyLong_FromUnicodeObject(obj, 10);
+        if (tmp != NULL) {
+            Py_DECREF(obj);
+            obj = tmp;  // obj is now a Python integer.
+        }
+        else {
+            // Conversion to an integer failed, now try to convert to a float.
+            // The only float that is allowed is nan, but we check for this
+            // below.  (Converting to float instead of doing a string
+            // comparision with "nan" ensures that the conversion accepts the
+            // same variations of the string "nan" as the builtin float() does,
+            //  e.g "NaN", "nAn", "-NAN", "  +naN\t", etc.)
+            PyErr_Clear();
+            tmp = PyFloat_FromString(obj);
+            Py_DECREF(obj);
+            if (tmp == NULL) {
+                PyErr_Clear();
+                return {= py_prefix =}_init_argument_error();
+            }
+            obj = tmp;  // obj is now a Python float.
+        }
+    }
+    else if (PyIndex_Check(obj)) {
+        PyObject *tmp = PyNumber_Index(obj);
+        Py_DECREF(obj);
+        if (tmp == NULL) {
+            // This can happen with a numpy array, e.g.
+            // >>> nint32(np.array([123]))
+            return -1;
+        }
+        obj = tmp;
+    }
+
+    if (PyLong_Check(obj)) {
+        long long value = PyLong_AsLongLong(obj);
+        Py_DECREF(obj);
+        if (PyErr_Occurred()) {
+            return -1;
+        }
+        if ((value <= {= INTNAN =}) || (value > INT{= nbits =}_MAX)) {
+            PyErr_SetString(PyExc_OverflowError, "int too big to convert to {= prefix =}");
+            return -1;
+        }
+        self->value = ({= ctype =}) value;
+        return 0;
+    }
+
+    if (PyFloat_Check(obj)) {
+        double value = PyFloat_AsDouble(obj);
+        Py_DECREF(obj);
+        if (!isnan(value)) {
+            return {= py_prefix =}_init_argument_error();
+        }
+        self->value = {= INTNAN =};
+        return 0;
+    }
+
+    Py_DECREF(obj);
+    return {= py_prefix =}_init_argument_error();
+}
+
+
+static PyObject*
+{= py_prefix =}_richcompare(PyObject* a, PyObject* b, int op)
+{
+    // This check relies on knowing Py_LT is 0 (the lowest value)
+    // and Py_GE is 5 (the greatest value).
+    if ((op < Py_LT) || (op > Py_GE)) {
+        PyErr_SetString(PyExc_ValueError, "invalid comparison op");
+        return NULL;
+    }
+    if (Py_TYPE(a) == &{= py_prefix =}_Type && Py_TYPE(b) == &{= py_prefix =}_Type) {
+        int result;
+        if ((({= py_prefix =} *) a)->value == {= INTNAN =} ||
+                (({= py_prefix =} *) b)->value == {= INTNAN =}) {
+            // One of the values is nan.
+            if (op == Py_NE) {
+                Py_INCREF(Py_True);
+                return Py_True;
+            }
+            else {
+                Py_INCREF(Py_False);
+                return Py_False;
+            }
+        }
+        switch (op) {
+            case Py_EQ: result = (({= py_prefix =} *) a)->value == (({= py_prefix =} *) b)->value; break;
+            case Py_LT: result = (({= py_prefix =} *) a)->value <  (({= py_prefix =} *) b)->value; break;
+            case Py_LE: result = (({= py_prefix =} *) a)->value <= (({= py_prefix =} *) b)->value; break;
+            case Py_NE: result = (({= py_prefix =} *) a)->value != (({= py_prefix =} *) b)->value; break;
+            case Py_GT: result = (({= py_prefix =} *) a)->value >  (({= py_prefix =} *) b)->value; break;
+            case Py_GE: result = (({= py_prefix =} *) a)->value >= (({= py_prefix =} *) b)->value; break;
+        };
+        return PyBool_FromLong(result);
+    }
+
+    if (Py_TYPE(a) != &{= py_prefix =}_Type) {
+        {= py_prefix =} *p = ({= py_prefix =} *) b;
+        PyObject *converted_b;
+        if (p->value == {= INTNAN =}) {
+            converted_b = PyFloat_FromDouble(NAN);
+        }
+        else {
+            converted_b = PyLong_FromSsize_t((Py_ssize_t) p->value);
+        }
+        if (converted_b == NULL) {
+            // Failed to convert a {= py_prefix =} to a Python integer or a
+            // float nan--maybe a MemoryError?
+            return NULL;
+        }
+        return PyObject_RichCompare(a, converted_b, op);
+    }
+    else {
+        {= py_prefix =} *p = ({= py_prefix =} *) a;
+        PyObject *converted_a;
+        if (p->value == {= INTNAN =}) {
+            converted_a = PyFloat_FromDouble(NAN);
+        }
+        else {
+            converted_a = PyLong_FromSsize_t((Py_ssize_t) p->value);
+        }
+        if (converted_a == NULL) {
+            // Failed to convert a {= py_prefix =} to a Python integer or a
+            // float nan--maybe a MemoryError?
+            return NULL;
+        }
+        return PyObject_RichCompare(converted_a, b, op);
+    }
+}
+
+
+static PyObject*
+{= py_prefix =}_repr(PyObject* self)
+{
+    {= ctype =} value = (({= py_prefix =}*) self)->value;
+    if (value == {= INTNAN =}) {
+        return PyUnicode_FromString("{= prefix =}('nan')");
+    }
+    else {
+        int64_t val64 = (int64_t) value;
+        return PyUnicode_FromFormat("{= prefix =}(%" PRId64 ")", val64);
+    }
+}
+
+static PyObject*
+{= py_prefix =}_str(PyObject* self)
+{
+    {= ctype =} value = (({= py_prefix =}*) self)->value;
+    if (value == {= INTNAN =}) {
+        return PyUnicode_FromString("nan");
+    }
+    else {
+        return PyUnicode_FromFormat("%" PRId{= nbits =}, value);
+    }
+}
+
+
+static Py_hash_t
+{= py_prefix =}_hash(PyObject* self)
+{
+    {= ctype =} value = (({= py_prefix =}*) self)->value;
+    // FIXME: What is a reasonable hash function?
+    Py_hash_t h = 131071 * value;
+    /* Never return the special error value -1 */
+    return h == -1 ? 2 : h;
+}
+
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Unary number methods for the Python type
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+static PyObject *
+{= py_prefix =}_nb_int({= py_prefix =} *o)
+{
+    if (o->value == {= INTNAN =}) {
+        PyErr_SetString(PyExc_ValueError,
+                        "cannot convert {= prefix =}('nan') to integer");
+        return NULL;
+    }
+    else {
+        PyObject *result = PyLong_FromLong((long) o->value);
+        return result;
+    }
+}
+
+// This implementation of nb_index might not be valid.  It raises
+// a TypeError if the argument is the integer nan, but shouldn't a
+// ValueError be raised for such a specific value?  The fact the
+// the documentation says that a TypeError should be raised on
+// failure suggests that the intent is that *any* instance of an
+// nint32 should be a valid index.  If that is the case, this
+// function should not be implemented.
+static PyObject *
+{= py_prefix =}_nb_index({= py_prefix =} *o)
+{
+    if (o->value == {= INTNAN =}) {
+        PyErr_SetString(PyExc_TypeError,
+                        "{= prefix =}('nan') cannot be interpreted as an integer");
+        return NULL;
+    }
+    else {
+        PyObject *result = PyLong_FromLong((long) o->value);
+        return result;
+    }
+}
+
+static PyObject *
+{= py_prefix =}_nb_float({= py_prefix =} *o)
+{
+    PyObject *result;
+    double dval;
+
+    dval = (o->value == {= INTNAN =}) ? NAN : (double) o->value;
+    result = PyFloat_FromDouble(dval);
+    return result;
+}
+
+
+static PyObject *
+{= py_prefix =}_nb_negative({= py_prefix =} *o)
+{
+    {= py_prefix =} *result = ({= py_prefix =} *) {= py_prefix =}_Type.tp_alloc(&{= py_prefix =}_Type, 0);
+    result->value = {= prefix =}_neg(o->value);
+    return (PyObject *) result;
+}
+
+
+static PyObject *
+{= py_prefix =}_nb_positive({= py_prefix =} *o)
+{
+    Py_INCREF(o);
+    return (PyObject *) o;
+}
+
+
+static PyObject *
+{= py_prefix =}_nb_absolute({= py_prefix =} *o)
+{
+    return (PyObject *) {= py_prefix =}_from_{= ctype =}({= prefix =}_abs((({= py_prefix =} *) o)->value));
+}
+
+
+static int
+{= py_prefix =}_nb_bool({= py_prefix =} *o)
+{
+    return o->value != 0;
+}
+
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Binary number methods for the Python type
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+// XXX This implementation could be simplified if we handle casting similar
+// to how it is done in {= py_prefix =}_nb_true_divide.  That is, for a mixed
+// expression nint32 + other (e.g.), where other is not a nint32, convert the nint32
+// to either a Python integer or a floating point nan, and do the addition with
+// the converted object.  But that would mean that, for example, nint32(5) + 1
+// would return the Python integer 6, not nint32(6), and nint32('nan') + 1
+// would return a Python float nan, not nint32('nan').
+
+static PyObject *
+{= py_prefix =}_nb_add(PyObject *o1, PyObject *o2)
+{
+    if ((Py_TYPE(o1) == &{= py_prefix =}_Type) && (Py_TYPE(o2) == &{= py_prefix =}_Type)) {
+        // Both arguments are {= prefix =}.
+        bool overflow = false;
+        {= ctype =} value = {= prefix =}_add((({= py_prefix =} *) o1)->value,
+                                             (({= py_prefix =} *) o2)->value, &overflow);
+        if (overflow) {
+            PyErr_SetString(PyExc_OverflowError, "result exceeds limits of {= prefix =}");
+            return NULL;
+        }
+        else {
+            return (PyObject *) {= py_prefix =}_from_{= ctype =}(value);
+        }
+    }
+
+    if (Py_TYPE(o1) != &{= py_prefix =}_Type) {
+        PyObject *tmp = o1;
+        o1 = o2;
+        o2 = tmp;
+    }
+
+    if (!PyNumber_Check(o2)) {
+        // The other argument is not a number.
+        Py_INCREF(Py_NotImplemented);
+        return Py_NotImplemented;
+    }
+
+    if (PyFloat_Check(o2)) {
+        // The other argument is a float, so cast the first argument to
+        // a C double, and return a Python float.
+        double value1 = {= prefix =}_as_double((({= py_prefix =} *) o1)->value);
+        return (PyObject *) PyFloat_FromDouble(value1 + PyFloat_AsDouble(o2));
+    }
+
+    // Try to convert the other argument to a C long long integer.
+    long long value2 = PyLong_AsLongLong(o2);
+    if (PyErr_Occurred()) {
+        if (PyErr_ExceptionMatches(PyExc_TypeError)) {
+            PyErr_Clear();
+            Py_INCREF(Py_NotImplemented);
+            return Py_NotImplemented;
+        }
+        else {
+            return NULL;
+        }
+    }
+
+    if ((value2 <= {= INTNAN =}) || (value2 > INT{= nbits =}_MAX)) {
+        PyErr_SetString(PyExc_OverflowError, "operand exceeds limits of {= prefix =}");
+        return NULL;        
+    }
+
+    bool overflow = false;
+    {= ctype =} value = {= prefix =}_add((({= py_prefix =} *) o1)->value, value2, &overflow);
+    if (overflow) {
+        PyErr_SetString(PyExc_OverflowError, "result exceeds limits of {= prefix =}");
+        return NULL;
+    }
+
+    return (PyObject *) {= py_prefix =}_from_{= ctype =}(value);
+}
+
+
+static PyObject *
+{= py_prefix =}_nb_subtract(PyObject *o1, PyObject *o2)
+{
+    if ((Py_TYPE(o1) == &{= py_prefix =}_Type) && (Py_TYPE(o2) == &{= py_prefix =}_Type)) {
+        // Both arguments are {= prefix =}.
+        bool overflow = false;
+        {= ctype =} value = {= prefix =}_subtract((({= py_prefix =} *) o1)->value,
+                                                  (({= py_prefix =} *) o2)->value, &overflow);
+        if (overflow) {
+            PyErr_SetString(PyExc_OverflowError, "result exceeds limits of {= prefix =}");
+            return NULL;
+        }
+        else {
+            return (PyObject *) {= py_prefix =}_from_{= ctype =}(value);
+        }
+    }
+
+    if (Py_TYPE(o1) != &{= py_prefix =}_Type) {
+        // The first argument is not an {= prefix =}, so o2 must be an {= prefix =}.
+        // Convert o2 to a standard Python type (either an integer or a floating
+        // point nan), and call PyNumber_Subtract with the converted object.
+        {= ctype =} value2 = (({= py_prefix =} *) o2)->value;
+        PyObject *v2 = (value2 == {= INTNAN =})
+                        ? PyFloat_FromDouble(NAN)
+                        : PyLong_FromLongLong((long long) value2);
+        return PyNumber_Subtract(o1, v2);
+    }
+    else {
+        // o1 is an {= prefix =}, o2 is not.
+        {= ctype =} value1 = (({= py_prefix =} *) o1)->value;
+        PyObject *v1 = (value1 == {= INTNAN =})
+                        ? PyFloat_FromDouble(NAN)
+                        : PyLong_FromLongLong((long long) value1);
+        return PyNumber_Subtract(v1, o2);
+    }
+}
+
+
+static PyObject *
+{= py_prefix =}_nb_multiply(PyObject *o1, PyObject *o2)
+{
+    if ((Py_TYPE(o1) == &{= py_prefix =}_Type) && (Py_TYPE(o2) == &{= py_prefix =}_Type)) {
+        // Both arguments are {= prefix =}.
+        bool overflow = false;
+        {= ctype =} value = {= prefix =}_multiply((({= py_prefix =} *) o1)->value,
+                                                  (({= py_prefix =} *) o2)->value, &overflow);
+        if (overflow) {
+            PyErr_SetString(PyExc_OverflowError, "result exceeds limits of {= prefix =}");
+            return NULL;
+        }
+        else {
+            return (PyObject *) {= py_prefix =}_from_{= ctype =}(value);
+        }
+    }
+
+    if (Py_TYPE(o1) != &{= py_prefix =}_Type) {
+        PyObject *tmp = o1;
+        o1 = o2;
+        o2 = tmp;
+    }
+
+    if (!PyNumber_Check(o2)) {
+        // The other argument is not a number.
+        Py_INCREF(Py_NotImplemented);
+        return Py_NotImplemented;
+    }
+
+    if (PyFloat_Check(o2)) {
+        // The other argument is a float, so cast the first argument to
+        // a C double, and return a Python float.
+        double value1 = {= prefix =}_as_double((({= py_prefix =} *) o1)->value);
+        // XXX Check for floating point overflow or underflow?
+        return (PyObject *) PyFloat_FromDouble(value1 * PyFloat_AsDouble(o2));
+    }
+
+    // Try to convert the other argument to a C long long integer.
+    long long value2 = PyLong_AsLongLong(o2);
+    if (PyErr_Occurred()) {
+        if (PyErr_ExceptionMatches(PyExc_TypeError)) {
+            PyErr_Clear();
+            Py_INCREF(Py_NotImplemented);
+            return Py_NotImplemented;
+        }
+        else {
+            return NULL;
+        }
+    }
+
+    if ((value2 <= {= INTNAN =}) || (value2 > INT{= nbits =}_MAX)) {
+        PyErr_SetString(PyExc_OverflowError, "operand exceeds limits of {= prefix =}");
+        return NULL;        
+    }
+
+    bool overflow = false;
+    {= ctype =} value = {= prefix =}_multiply((({= py_prefix =} *) o1)->value, value2, &overflow);
+    if (overflow) {
+        PyErr_SetString(PyExc_OverflowError, "result exceeds limits of {= prefix =}");
+        return NULL;
+    }
+
+    return (PyObject *) {= py_prefix =}_from_{= ctype =}(value);
+}
+
+
+static PyObject *
+{= py_prefix =}_nb_floor_divide(PyObject *o1, PyObject *o2)
+{
+    if ((Py_TYPE(o1) == &{= py_prefix =}_Type) && (Py_TYPE(o2) == &{= py_prefix =}_Type)) {
+        // Both arguments are {= prefix =}.
+        bool zero_division = false;
+        {= ctype =} value = {= prefix =}_floor_divide((({= py_prefix =} *) o1)->value,
+                                                      (({= py_prefix =} *) o2)->value, &zero_division);
+        if (zero_division) {
+            PyErr_SetString(PyExc_ZeroDivisionError, "division by zero");
+            return NULL;
+        }
+        else {
+            return (PyObject *) {= py_prefix =}_from_{= ctype =}(value);
+        }
+    }
+
+    if (Py_TYPE(o1) != &{= py_prefix =}_Type) {
+        // The first argument is not an {= prefix =}, so o2 must be an {= prefix =}.
+        // Convert o2 to a standard Python type (either an integer or a floating
+        // point nan), and call PyNumber_Subtract with the converted object.
+        {= ctype =} value2 = (({= py_prefix =} *) o2)->value;
+        PyObject *v2 = (value2 == {= INTNAN =})
+                        ? PyFloat_FromDouble(NAN)
+                        : PyLong_FromLongLong((long long) value2);
+        return PyNumber_FloorDivide(o1, v2);
+    }
+    else {
+        // o1 is an nint32, o2 is not.
+        {= ctype =} value1 = (({= py_prefix =} *) o1)->value;
+        PyObject *v1 = (value1 == {= INTNAN =})
+                        ? PyFloat_FromDouble(NAN)
+                        : PyLong_FromLongLong((long long) value1);
+        return PyNumber_FloorDivide(v1, o2);
+    }
+}
+
+
+static PyObject *
+{= py_prefix =}_nb_true_divide(PyObject *o1, PyObject *o2)
+{
+    if ((Py_TYPE(o1) == &{= py_prefix =}_Type) && (Py_TYPE(o2) == &{= py_prefix =}_Type)) {
+        // Both arguments are {= prefix =}.
+        bool zero_division = false;
+        double value = {= prefix =}_true_divide((({= py_prefix =} *) o1)->value,
+                                                (({= py_prefix =} *) o2)->value, &zero_division);
+        if (zero_division) {
+            PyErr_SetString(PyExc_ZeroDivisionError, "division by zero");
+            return NULL;
+        }
+        else {
+            return (PyObject *) PyFloat_FromDouble(value);
+        }
+    }
+
+    if (Py_TYPE(o1) != &{= py_prefix =}_Type) {
+        // The first argument is not an {= prefix =}, so o2 must be an {= prefix =}.
+        // Convert o2 to a standard Python type (either an integer or a floating
+        // point nan), and call PyNumber_TrueDivde with the converted object.
+        {= ctype =} value2 = (({= py_prefix =} *) o2)->value;
+        PyObject *v2 = (value2 == {= INTNAN =})
+                        ? PyFloat_FromDouble(NAN)
+                        : PyLong_FromLongLong((long long) value2);
+        return PyNumber_TrueDivide(o1, v2);
+    }
+    else {
+        // o1 is an {= prefix =}, o2 is not.
+        {= ctype =} value1 = (({= py_prefix =} *) o1)->value;
+        PyObject *v1 = (value1 == {= INTNAN =})
+                        ? PyFloat_FromDouble(NAN)
+                        : PyLong_FromLongLong((long long) value1);
+        return PyNumber_TrueDivide(v1, o2);
+    }
+}
+
+
+// Python number protocol methods for {= prefix =}.
+
+static PyNumberMethods {= py_prefix =}_as_number = {
+    .nb_add          = {= py_prefix =}_nb_add,
+    .nb_subtract     = {= py_prefix =}_nb_subtract,
+    .nb_multiply     = {= py_prefix =}_nb_multiply,
+    .nb_negative     = (unaryfunc) {= py_prefix =}_nb_negative,
+    .nb_positive     = (unaryfunc) {= py_prefix =}_nb_positive,
+    .nb_absolute     = (unaryfunc) {= py_prefix =}_nb_absolute,
+    .nb_bool         = (inquiry) {= py_prefix =}_nb_bool,
+    .nb_int          = (unaryfunc) {= py_prefix =}_nb_int,
+    .nb_float        = (unaryfunc) {= py_prefix =}_nb_float,
+    .nb_floor_divide = {= py_prefix =}_nb_floor_divide,
+    .nb_true_divide  = {= py_prefix =}_nb_true_divide,
+    .nb_index        = (unaryfunc) {= py_prefix =}_nb_index,
+};
+
+
+// Python type object for {= prefix =}.
+
+static PyTypeObject {= py_prefix =}_Type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name        = "{= prefix =}",
+    .tp_basicsize   = sizeof({= py_prefix =}),
+    .tp_repr        = {= py_prefix =}_repr,
+    .tp_as_number   = &{= py_prefix =}_as_number,
+    .tp_hash        = {= py_prefix =}_hash,
+    .tp_str         = {= py_prefix =}_str,
+    .tp_flags       = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .tp_doc         = "{= nbits =} bit signed integer with NAN value",
+    .tp_richcompare = {= py_prefix =}_richcompare,
+    .tp_init        = (initproc) {= py_prefix =}_init,
+    .tp_new         = PyType_GenericNew,
+};
+
+{% else %}
+// WHAT HAPPENED?!?!?!?!?
+{% endfor %}
+
+PyMethodDef module_methods[] = {
+    {0} // sentinel
+};
+
+
+static struct PyModuleDef moduledef = {
+    .m_base     = PyModuleDef_HEAD_INIT,
+    .m_name     = "_nint",
+    .m_size     = -1,
+    .m_methods  = module_methods,
+};
+
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Python extension module definition.
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+PyMODINIT_FUNC
+PyInit__nint(void) {
+    PyObject* m = NULL;
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // Set up the Python types
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+{% for prefix, py_prefix in zip(common.int_prefixes, common.py_prefixes) %}
+
+    // Initialize {= prefix =} type object
+    if (PyType_Ready(&{= py_prefix =}_Type) < 0) {
+        return NULL;
+    }
+
+{% endfor %}
+
+    // Create module
+    m = PyModule_Create(&moduledef);
+    if (!m) {
+        return NULL;
+    }
+
+{% for prefix, py_prefix in zip(common.int_prefixes, common.py_prefixes) %}
+
+    // Add {= prefix =} type
+    Py_INCREF(&{= py_prefix =}_Type);
+    PyModule_AddObject(m, "{= prefix =}", (PyObject*) &{= py_prefix =}_Type);
+
+{% endfor %}
+
+    return m;
+}

@@ -7,6 +7,10 @@ project(
   ]
 )
 
+fs = import('fs')
+
+process_jinja_py = fs.copyfile('tools/process_jinja.py')
+
 py_mod = import('python')
 py = py_mod.find_installation(pure: false)
 
@@ -65,10 +69,11 @@ py.install_sources(
 py.install_sources(
   [
     'numtypesx/tests/__init__.py',
+    'numtypesx/tests/test_comparison.py',
+    'numtypesx/tests/test_copy.py',
     'numtypesx/tests/test_logfloat_scalars.py',
     'numtypesx/tests/test_logfloat_ufuncs.py',
-    'numtypesx/tests/test_copy.py',
-    'numtypesx/tests/test_comparison.py',
+    'numtypesx/tests/test_nint_python_scalar.py',
   ],
   subdir : 'numtypesx/tests',
 )
