@@ -74,7 +74,7 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        pip install meson ninja meson-python pytest toml
+        pip install meson ninja meson-python pytest toml Jinja2
 
     - name: Install numpy (from anaconda nightly repo)
       run: |
