@@ -15,6 +15,8 @@
 #include <math.h>
 #include <structmember.h>
 
+#include "nint_python_scalars.h"
+
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Signed integers with the most negative value treated as NAN.
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -271,23 +273,11 @@ static inline double
 // Create a Python type.
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-
-typedef struct {
-    PyObject_HEAD
-    {= ctype =} value;
-} {= py_prefix =};
-
-
-// Forward declaration.
-static PyTypeObject {= py_prefix =}_Type;
-
-
 static inline int
 {= py_prefix =}_Check(PyObject* object)
 {
     return PyObject_IsInstance(object, (PyObject*) &{= py_prefix =}_Type);
 }
-
 
 static PyObject*
 {= py_prefix =}_from_{= ctype =}({= ctype =} x)
@@ -299,7 +289,6 @@ static PyObject*
     return (PyObject*) p;
 }
 
-
 static int
 {= py_prefix =}_init_argument_error(void)
 {
@@ -309,7 +298,6 @@ static int
                     "or another {= prefix =} instance.");
     return -1;
 }
-
 
 static int
 {= py_prefix =}_init({= py_prefix =} *self, PyObject *args, PyObject *kwds)
@@ -322,11 +310,51 @@ static int
     }
     Py_INCREF(obj);
 
+{% for k in range(loop.index0)              %}
+{%   set val_prefix = common.py_prefixes[k] %}
+{%   set VALNAN = common.int_nans[k]        %}
+
+    if ({= val_prefix =}_Check(obj)) {
+        // Upcast from a smaller nint type.
+        self->value = (({= val_prefix =} *) obj)->value;
+        if (self->value == {= VALNAN =}) {
+            self->value = {= INTNAN =};
+        }
+        Py_DECREF(obj);
+        return 0;
+    }
+
+{% endfor %}
+
     if ({= py_prefix =}_Check(obj)) {
         self->value = (({= py_prefix =} *) obj)->value;
         Py_DECREF(obj);
         return 0;
     }
+
+{% for k in range(loop.index0 + 1, 4)       %}
+{%   set val_ctype = common.int_ctypes[k]   %}
+{%   set val_prefix = common.py_prefixes[k] %}
+{%   set VALNAN = common.int_nans[k]        %}
+
+    if ({= val_prefix =}_Check(obj)) {
+        // Downcast from a larger nint type.
+        {= val_ctype =} value = (({= val_prefix =} *) obj)->value;
+        if (value == {= VALNAN =}) {
+            value = {= INTNAN =};
+        }
+        else {
+            if ((value <= {= INTNAN =}) || (value > INT{= nbits =}_MAX)) {
+                PyErr_SetString(PyExc_OverflowError, "int too big to convert to {= prefix =}");
+                return -1;
+            }
+        }
+        self->value = ({= ctype =}) value;
+        Py_DECREF(obj);
+        return 0;
+    }
+
+{% endfor %}
 
     if (PyUnicode_Check(obj)) {
         // Argument is a string.

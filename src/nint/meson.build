@@ -5,7 +5,8 @@ jinja = generator(py,
                   arguments : ['process_jinja.py', '@INPUT@', '@BUILD_DIR@'],
                   depends : [process_jinja_py, common_jinja])
 
-nint_python_scalars_c = jinja.process('nint_python_scalars.c.jinja')
+nint_python_scalars_c = jinja.process('nint_python_scalars.h.jinja',
+                                      'nint_python_scalars.c.jinja')
 
 py.extension_module(
     '_nint',

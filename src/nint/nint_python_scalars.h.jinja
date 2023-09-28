@@ -1,0 +1,19 @@
+#include <Python.h>
+#include <stdint.h>
+
+{% set common = namespace() %}
+{% include "common.jinja" %}
+
+{% for ctype, py_prefix in zip(common.int_ctypes, common.py_prefixes) %}
+
+typedef struct {
+    PyObject_HEAD
+    {= ctype =} value;
+} {= py_prefix =};
+
+static PyTypeObject {= py_prefix =}_Type;
+
+static inline int
+{= py_prefix =}_Check(PyObject* object);
+
+{% endfor %}
