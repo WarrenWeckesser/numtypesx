@@ -212,71 +212,6 @@ logfloat{= nbits =}_log_power({= ctype =} log1, {= ctype =} log2)
 
 {% endfor %}
 
-static NPY_CASTING
-generic_unary_resolve_descriptors(
-    PyObject *self,
-    PyArray_DTypeMeta *dtypes[],
-    PyArray_Descr *given_descrs[],
-    PyArray_Descr *loop_descrs[],
-    npy_intp *unused
-)
-{
-    Py_INCREF(given_descrs[0]);
-    loop_descrs[0] = given_descrs[0];
- 
-    if (given_descrs[1] == NULL) {
-        Py_INCREF(given_descrs[0]);
-        loop_descrs[1] = given_descrs[0];
-    }
-    return NPY_NO_CASTING;
-}
-
-
-static NPY_CASTING
-generic_binary_resolve_descriptors(
-    PyObject *self,
-    PyArray_DTypeMeta *dtypes[],
-    PyArray_Descr *given_descrs[],
-    PyArray_Descr *loop_descrs[],
-    npy_intp *unused
-)
-{
-    // The logfloat types are not parametrized, so we assume that
-    // given_descrs[0] and given_descrs[1] are the same.
-    Py_INCREF(given_descrs[0]);
-    loop_descrs[0] = given_descrs[0];
-    Py_INCREF(given_descrs[1]);
-    loop_descrs[1] = given_descrs[1];
-    if (given_descrs[2] == NULL) {
-        Py_INCREF(given_descrs[0]);
-        loop_descrs[2] = given_descrs[0];
-    }
-    return NPY_NO_CASTING;
-}
-
-static NPY_CASTING
-comparison_resolve_descriptors(
-    PyObject *self,
-    PyArray_DTypeMeta *dtypes[],
-    PyArray_Descr *given_descrs[],
-    PyArray_Descr *loop_descrs[],
-    npy_intp *unused
-)
-{
-    // The logfloat types are not parametrized, so we assume that
-    // given_descrs[0] and given_descrs[1] are the same.
-    Py_INCREF(given_descrs[0]);
-    loop_descrs[0] = given_descrs[0];
-    Py_INCREF(given_descrs[1]);
-    loop_descrs[1] = given_descrs[1];
-    if (given_descrs[2] == NULL) {
-        PyArray_Descr *bool_descr = PyArray_DescrFromType(NPY_BOOL);
-        loop_descrs[2] = bool_descr;
-        // XXX Py_INCREF(bool_descr); ???
-    }
-    return NPY_NO_CASTING;
-}
-
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // In these nested template loops, the strided loop functions
 // are defined.
@@ -496,7 +431,6 @@ init_logfloat_ufuncs(void)
 {% for nbits in ['32', '64'] %}
 
     static PyType_Slot logfloat{= nbits =}_{= oper =}_slots[] = {
-        {NPY_METH_resolve_descriptors, &generic_unary_resolve_descriptors},
         {NPY_METH_strided_loop, &logfloat{= nbits =}_{= oper =}_strided_loop},
         {0, NULL}
     };
@@ -534,7 +468,6 @@ init_logfloat_ufuncs(void)
 {% for nbits in ['32', '64'] %}
 
     static PyType_Slot logfloat{= nbits =}_{= oper =}_slots[] = {
-        {NPY_METH_resolve_descriptors, &generic_binary_resolve_descriptors},
         {NPY_METH_strided_loop, &logfloat{= nbits =}_{= oper =}_strided_loop},
         {0, NULL}
     };
@@ -572,7 +505,6 @@ init_logfloat_ufuncs(void)
 {% for nbits in ['32', '64'] %}
 
     static PyType_Slot logfloat{= nbits =}_{= oper =}_slots[] = {
-        {NPY_METH_resolve_descriptors, &comparison_resolve_descriptors},
         {NPY_METH_strided_loop, &logfloat{= nbits =}_{= oper =}_strided_loop},
         {0, NULL}
     };

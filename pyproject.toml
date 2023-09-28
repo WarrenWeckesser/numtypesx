@@ -12,7 +12,7 @@ build-backend = "mesonpy"
 [project]
 name = "numtypesx"
 description = "Custom data types for NumPy using the new DType system"
-version = "0.0.2dev2"
+version = "0.0.2dev3"
 readme = 'README.md'
 author = "Warren Weckesser"
 requires-python = ">=3.9.0"
