@@ -12,28 +12,6 @@
 
 {% for nbits, ctype, suffix in [('32', 'float', 'f'), ('64', 'double', '')] %}
 
-static NPY_CASTING logfloat{= nbits =}_to_logfloat{= nbits =}_resolve_descriptors(
-    PyObject* NPY_UNUSED(self),
-    PyArray_DTypeMeta* NPY_UNUSED(dtypes[2]),
-    PyArray_Descr* given_descrs[2],
-    PyArray_Descr* loop_descrs[2],
-    npy_intp* view_offset
-) {
-    Py_INCREF(given_descrs[0]);
-    loop_descrs[0] = given_descrs[0];
-
-    if (given_descrs[1] == NULL) {
-        Py_INCREF(given_descrs[0]);
-        loop_descrs[1] = given_descrs[0];
-    }
-    else {
-        Py_INCREF(given_descrs[1]);
-        loop_descrs[1] = given_descrs[1];
-    }
-
-    return NPY_NO_CASTING;
-}
-
 static int logfloat{= nbits =}_to_logfloat{= nbits =}_contiguous(
     PyArrayMethod_Context *NPY_UNUSED(context),
     char* const data[],
@@ -135,7 +113,6 @@ static int logfloat{= nbits =}_to_logfloat{= nbits =}_get_loop(
 static PyArray_DTypeMeta* LogFloat{= nbits =}_to_LogFloat{= nbits =}_DTypes[2] = { NULL, NULL };
 
 static PyType_Slot LogFloat{= nbits =}_to_LogFloat{= nbits =}_Slots[] = {
-    { NPY_METH_resolve_descriptors, &logfloat{= nbits =}_to_logfloat{= nbits =}_resolve_descriptors },
     { _NPY_METH_get_loop, &logfloat{= nbits =}_to_logfloat{= nbits =}_get_loop },
     { 0, NULL }
 };
